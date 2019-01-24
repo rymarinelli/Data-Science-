@@ -1,0 +1,342 @@
+use C:\Users\wbs45\Desktop\ap_pair_rep.dta
+
+ssc install ivhettest
+ssc install reghdfe
+ssc install ivreg2
+ssc install ranktest 
+ssc install dataex
+ssc install outreg2
+ssc install estout
+
+
+gen ginilo = ln(fgini/(1-fgini))
+gen nlg = -ln(fgini)
+gen nlhhi = -ln(hhi)
+decode rcid, generate(rc)
+gen origin = substr(rc,1,3)
+encode origin, gen(ori)
+gen destn = substr(rc,4,3)
+encode destn, gen(dest)
+gen carrier = substr(rc,7,2)
+encode carrier, gen(air)
+gen i=132
+tab date, gen(yq)
+tab air, gen(ai)
+
+
+** Cleaning Data 
+// Imports Market Data 
+save "C:\Users\wbs45\Desktop\list",replace
+forvalues i=1/42{
+use C:\Users\wbs45\Desktop\list
+import delimited "C:\Users\wbs45\Desktop\DB1B_MARKET\DB1B_MARKET_`=list[`i']'", clear
+use C:\Users\wbs45\Desktop\list
+save "C:\Users\wbs45\Desktop\DB1B_STATA_MARKET\DB1B_STATA_MARKET_`=list[`i']'",replace
+}
+
+
+forvalues i=1/42{
+use C:\Users\wbs45\Desktop\list
+import delimited "C:\Users\wbs45\Desktop\DB1B_COUPON\DB1B_COUPON_`=list[`i']'", clear
+use C:\Users\wbs45\Desktop\list
+save "C:\Users\wbs45\Desktop\DB1B_STATA_COUPON\DB1B_STATA_COUPON_`=list[`i']'",replace
+}
+
+
+forvalues i=1/42{
+use C:\Users\wbs45\Desktop\list
+import delimited "C:\Users\wbs45\Desktop\DB1B_COUPON\DB1B_TICKET_`=list[`i']'", clear
+use C:\Users\wbs45\Desktop\list
+save "C:\Users\wbs45\Desktop\DB1B_STATA_TICKET\DB1B_STATA_TICKET_`=list[`i']'",replace
+}
+
+// Appending datasets 
+for values i = 1/42
+append "C:\Users\wbs45\Desktop\DB1B_COUPON\DB1B_TICKET_`=list[`i']'"
+use C:\Users\wbs45\Desktop\list
+save "C:\Users\wbs45\Desktop\DB1B_STATA_TICKET\DB1B_STATA_TICKET_`=list[`i']'",replace
+} 
+
+for values i = 1/42
+append "C:\Users\wbs45\Desktop\DB1B_COUPON\DB1B_MARKET_`=list[`i']'"
+use C:\Users\wbs45\Desktop\list
+save "C:\Users\wbs45\Desktop\DB1B_STATA_TICKET\DB1B_STATA_MARKET_`=list[`i']'",replace
+} 
+
+for values i = 1/42
+append "C:\Users\wbs45\Desktop\DB1B_COUPON\DB1B_COUPON_`=list[`i']'"
+use C:\Users\wbs45\Desktop\list
+save "C:\Users\wbs45\Desktop\DB1B_STATA_TICKET\DB1B_STATA_COUPON_`=list[`i']'",replace
+} 
+
+//Motivating IV Regression 
+
+* Testing Endogenity for 10th percentile 
+regress  nlhhi ginilo lp10 lp90 lp10_res date
+regress  lp10 nlhhi ginilo lp90 date
+predict  lp10_res, residuals
+test     lp10_res
+
+* Testing Endogenity for 90th percentile
+regress  lp90 nlhhi ginilo lp10 date
+predict  lp90_res, residuals
+regress  nlhhi ginilo lp10 lp90 lp90_res date
+test     lp90_res
+
+
+* Testing Endogenity for 90th percentile
+regress nlhhi lp90 ginilo lp10 date
+predict nlhhi_res, residuals
+regress nlhhi ginilo lp10 lp90 nlhhi_res date
+test nlhhi_res
+
+// Making Tables 
+regress  nlhhi ginilo lp10 lp90 lp10_res date
+outreg2 using myreg.doc, replace ctitle( 10th Percentile)
+
+regress  nlhhi ginilo lp10 lp90 lp90_res date
+outreg2 using myreg.doc, append ctitle(90th Percentile)
+
+regress nlhhi ginilo lp10 lp90 nlhhi_res date
+outreg2 using myreg.doc, append ctitle(HHI)
+
+// Testing IV Regression 
+ replace i = 132
+ while i<195 {
+ ivregress 2sls lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date== i
+ estat first
+ estat overid 
+ estat endogenous 
+ ivhettest
+ replace i = i + 1
+ }
+
+ replace i = 132
+ while i<195 {
+ivregress 2sls lp90 air* (nlhhi=ltot_route lgmean_msa genp) if date== i
+ estat first
+ estat overid 
+ estat endogenous 
+ replace i = i + 1
+ }
+
+ replace i = 132
+ while i<195 {
+ ivregress 2sls ginilo air* (nlhhi=ltot_route lgmean_msa genp) if date== i
+ estat first
+ estat overid 
+ estat endogenous 
+ replace i = i + 1
+ }
+ 
+ // Making Tables for IV Reg
+ 
+ ivregress 2sls lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date== i
+ outreg2 using IVreg.doc, replace ctitle( 10th Percentile)
+ 
+ ivregress 2sls lp90 air* (nlhhi=ltot_route lgmean_msa genp) if date== i
+ outreg2 using IVreg.doc, append ctitle(90th Percentile)
+ 
+ ivregress 2sls ginilo air* (nlhhi=ltot_route lgmean_msa genp) if date== i 
+ outreg2 using IVreg.doc, append ctitle(Log-Odds Gini)
+ 
+ 
+ // Testing for heteroskedacity.
+ replace i = 132
+ while i<195 {
+ ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date== i
+ ivhettest
+ replace i = i + 1
+ }
+ 
+ replace i = 132
+ while i<195 {
+ ivreg2 lp90 air* (nlhhi=ltot_route lgmean_msa genp) if date== i 
+ replace i = i + 1
+ }
+
+ replace i = 132
+ while i<195 {
+ ivreg2 ginilo air* (nlhhi=ltot_route lgmean_msa genp) if date== i
+ ivhettest
+ replace i = i + 1
+ }
+ 
+ 
+/* IV Regression is not the most efficent estimator since,
+   there is heteroskedacity. We use GMM to correct the estimates. 
+*/
+   
+ replace i = 132
+ while i<195 {
+ ivregress gmm lp90 air* (nlhhi=ltot_route lgmean_msa genp) if date==i, vce(robust)
+ replace i = i + 1
+ }  
+
+ 
+// These regressions are to be used as test cases
+ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date== 132
+ivregress gmm lp90 air* (nlhhi=ltot_route lgmean_msa genp) if date==132, vce(robust)
+ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date==132, gmm2s robust 
+   
+   
+ // Tests for differences between IV-SLS and 2-Stage-GMM 
+ ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date== 132
+ estimates store tsls
+ ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date==132, gmm2s robust
+ estimates store gmm
+ hausman tsls gmm , sigmamore force
+ 
+// Test for difference between IV-GMM and Two-Stage-GMM
+
+replace i = 132
+while i < 195 {
+ivregress gmm lp90 air* (nlhhi=ltot_route lgmean_msa genp) if date==i, vce(robust) 
+estimates store gmm1
+
+ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date==i, gmm2s robust
+estimates store gmm2
+hausman gmm1 gmm2, sigmamore force
+
+replace i = i + 1
+}
+
+
+// Further testing the relationship 
+replace i = 132
+while i<195 {
+ivregress gmm lp90 air* (nlhhi=ltot_route lgmean_msa genp) if date==i, vce(robust) 
+estimates store gmm1
+
+ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date==i, gmm2s robust
+estimates store gmm2
+hausman gmm1 gmm2 , sigmamore force
+		
+replace i = i + 1		
+ } 
+// There appears to be a systematic relationship. Intuiton suggests that 2-Step-GMM is better. 
+// This is because heteroskedasticity is arbitrary to the model. 
+
+// Testing Final Model 
+ ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date==i, gmm2s robust
+ // Rejects underification Test 
+ 
+ // Hansen J Test is problematic 
+
+ // Testing for Intra-Class Corr 
+ icc hhi fgini
+ 
+ // There is Intra-Class Correlation that biases Hansen J Test 
+ ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date==i, gmm2s robust
+ 
+// Rotation of Instruments  
+ ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date==i, gmm2s robust
+  ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa) if date==i, gmm2s robust
+ ivreg2 lp10 air* (nlhhi=ltot_route genp) if date==i, gmm2s robust
+  ivreg2 lp10 air* (nlhhi= lgmean_msa genp) if date==i, gmm2s robust
+ 
+ 
+ // Over Identified Test Rejected 
+ ivreg2 lp10 air* (nlhhi=ltot_route genp) if date==i, gmm2s robust
+ 
+ ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date==i, gmm2s robust
+ ivreg2 lp10 air* (nlhhi=ltot_route genp) if date==i, gmm2s robust
+  
+
+**Generalized loop for getting coeffs
+
+**Get log-odds gini regression coeffs on -ln(hhi)
+matrix co_glo_nlh=J(1,64,0)
+gen glo_nlh=0
+replace i=132
+while i<196{
+quietly ivreg ginilo air* (nlhhi=ltot_route lgmean_msa genp) if date==i
+mat beta=e(b)
+matrix co_glo_nlh[1,i-131]=beta[1,1]
+di i
+replace i=i+1
+}
+replace i=195
+replace glo_nlh=co_glo_nlh[1,date-131]
+
+**Get log-odds gini regression coeffs on -ln(hhi) (GMM)
+matrix co_glo_gmm_nlh=J(1,64,0)
+gen glo_gmm_nlh=0
+replace i=132
+while i<196{
+quietly ivregress gmm ginilo air* (nlhhi=ltot_route lgmean_msa genp) if date==i, vce(robust)
+mat beta=e(b)
+matrix co_glo_gmm_nlh[1,i-131]=beta[1,1]
+di i
+replace i=i+1
+}
+replace i=195
+replace glo_gmm_nlh=co_glo_gmm_nlh[1,date-131]
+
+**Get p10 regression coeffs on -ln(hhi)
+matrix co_p10_nlh=J(1,64,0)
+gen p10_nlh=0
+replace i=132
+while i<196{
+quietly ivreg lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date==i
+mat beta=e(b)
+matrix co_p10_nlh[1,i-131]=beta[1,1]
+di i
+replace i=i+1
+}
+replace i=195
+replace p10_nlh=co_p10_nlh[1,date-131]
+
+**Get p10 regression coeffs on -ln(hhi) (GMM)
+matrix co_p10_gmm_nlh=J(1,64,0)
+gen p10_gmm_nlh=0
+replace i=132
+while i<196{
+quietly ivregress gmm lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date==i, vce(robust)
+mat beta=e(b)
+matrix co_p10_gmm_nlh[1,i-131]=beta[1,1]
+di i
+replace i=i+1
+}
+replace i=195
+replace p10_gmm_nlh=co_p10_gmm_nlh[1,date-131]
+
+**Get p90 regression coeffs on -ln(hhi)
+matrix co_p90_nlh=J(1,64,0)
+gen p90_nlh=0
+replace i=132
+while i<196{
+quietly ivregress 2sls lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date==i
+mat beta=e(b)
+matrix co_p90_nlh[1,i-131]=beta[1,1]
+di i
+replace i=i+1
+}
+replace i=195
+replace p90_nlh=co_p90_nlh[1,date-131]
+
+**Get p90 regression coeffs on -ln(hhi) (GMM)
+matrix co_p90_gmm_nlh=J(1,64,0)
+gen p90_gmm_nlh=0
+replace i=132
+while i<196{
+quietly ivregress gmm lp90 air* (nlhhi=ltot_route lgmean_msa genp) if date==i, vce(robust)
+mat beta=e(b)
+matrix co_p90_gmm_nlh[1,i-131]=beta[1,1]
+di i
+replace i=i+1
+}
+replace i=195
+replace p90_gmm_nlh=co_p90_gmm_nlh[1,date-131]
+
+
+// Testing final models 
+ ivreg2 lp10 air* (nlhhi=ltot_route genp) if date==i, gmm2s robust
+ ivreg2 lp90 air* (nlhhi=ltot_route genp) if date==i, gmm2s robust
+ ivreg2 ginilo air* (nlhhi=ltot_route genp) if date==i, gmm2s robust
+ 
+ 
+
+
+ 
+
