@@ -2,7 +2,7 @@
 * Ecometrics Rought Draft Analysis 
 
 * Finding how variables impact if a party will stay in power
-* The DV is binary so the betas will describe increases in probability. 
+* The DP is binary so the betas will describe increases in probability. 
 * R^2 is 15. 
 regress partywasrelected dem_spending_2006 campaignspendingin2006dollarsfor 
 gini unemploymentoct percentofpopulationthatvoted poputionofstate 
