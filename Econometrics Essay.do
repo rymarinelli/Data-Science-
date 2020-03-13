@@ -1,5 +1,5 @@
 *Ryan Marinelli 
-* Ecometrics Rought Draft Analysis 
+* Econometrics Rought Draft Analysis 
 
 * Finding how variables impact if a party will stay in power
 * The DP is binary so the betas will describe increases in probability. 
