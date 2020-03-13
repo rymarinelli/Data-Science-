@@ -1,5 +1,9 @@
+
+*Working Directory
 use C:\Users\wbs45\Desktop\ap_pair_rep.dta
 
+
+*Import Statements 
 ssc install ivhettest
 ssc install reghdfe
 ssc install ivreg2
@@ -8,9 +12,11 @@ ssc install dataex
 ssc install outreg2
 ssc install estout
 
-
+*Take the negative log-odds ratio
 gen ginilo = ln(fgini/(1-fgini))
 gen nlg = -ln(fgini)
+
+*Compute the Herfindahl index 
 gen nlhhi = -ln(hhi)
 decode rcid, generate(rc)
 gen origin = substr(rc,1,3)
@@ -90,7 +96,7 @@ predict nlhhi_res, residuals
 regress nlhhi ginilo lp10 lp90 nlhhi_res date
 test nlhhi_res
 
-// Making Tables 
+// Making Tables of results using outreg library
 regress  nlhhi ginilo lp10 lp90 lp10_res date
 outreg2 using myreg.doc, replace ctitle( 10th Percentile)
 
@@ -129,7 +135,7 @@ ivregress 2sls lp90 air* (nlhhi=ltot_route lgmean_msa genp) if date== i
  replace i = i + 1
  }
  
- // Making Tables for IV Reg
+ // Making Tables for IV Reg using outreg library
  
  ivregress 2sls lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date== i
  outreg2 using IVreg.doc, replace ctitle( 10th Percentile)
@@ -219,7 +225,7 @@ replace i = i + 1
 
 // Testing Final Model 
  ivreg2 lp10 air* (nlhhi=ltot_route lgmean_msa genp) if date==i, gmm2s robust
- // Rejects underification Test 
+ // Rejects underidentifcation Test 
  
  // Hansen J Test is problematic 
 
